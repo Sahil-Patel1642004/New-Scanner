@@ -1,0 +1,49 @@
+....                                                                     [100%]
+============================== warnings summary ===============================
+..\.venv\Lib\site-packages\starlette\testclient.py:51
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\.venv\Lib\site-packages\starlette\testclient.py:51: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+..\.venv\Lib\site-packages\fastapi\routing.py:234
+..\.venv\Lib\site-packages\fastapi\routing.py:234
+..\.venv\Lib\site-packages\fastapi\routing.py:234
+..\.venv\Lib\site-packages\fastapi\routing.py:234
+..\.venv\Lib\site-packages\fastapi\routing.py:234
+..\.venv\Lib\site-packages\fastapi\routing.py:234
+..\.venv\Lib\site-packages\fastapi\routing.py:234
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\.venv\Lib\site-packages\fastapi\routing.py:234: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    is_coroutine = asyncio.iscoroutinefunction(dependant.call)
+
+tests/test_admin_auth.py::test_admin_login_and_dashboard
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\.venv\Lib\site-packages\passlib\handlers\argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for structlog's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+tests/test_admin_auth.py::test_admin_login_and_dashboard
+tests/test_admin_auth.py::test_admin_login_and_dashboard
+tests/test_admin_auth.py::test_admin_login_rejects_wrong_password
+tests/test_admin_auth.py::test_logout_revokes_session
+tests/test_admin_auth.py::test_logout_revokes_session
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\.venv\Lib\site-packages\sqlalchemy\sql\schema.py:3624: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+tests/test_admin_auth.py::test_admin_login_and_dashboard
+tests/test_admin_auth.py::test_logout_revokes_session
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\backend\app\api\v1\admin.py:27: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expires_at = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+
+tests/test_admin_auth.py::test_admin_login_and_dashboard
+tests/test_admin_auth.py::test_logout_revokes_session
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\backend\app\api\v1\admin.py:35: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    admin_user.last_login = datetime.utcnow()
+
+tests/test_admin_auth.py::test_admin_login_and_dashboard
+tests/test_admin_auth.py::test_logout_revokes_session
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\backend\app\dependencies.py:47: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    if session.expires_at < datetime.utcnow():
+
+tests/test_admin_auth.py::test_logout_revokes_session
+  C:\OneDriveTemp\OneDrive\Desktop\Scannner\Smart_Image_Text_Search\backend\app\api\v1\admin.py:48: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    token.revoked_at = datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4 passed, 21 warnings in 2.32s

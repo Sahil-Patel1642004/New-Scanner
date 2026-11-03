@@ -1,0 +1,47 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# PyInstaller
+build/
+dist/
+*.spec
+!/SmartImageSearch.spec
+
+# JavaScript dependencies and generated assets
+node_modules/
+/admin-dashboard/dist/
+/admin-dashboard/.vite/
+
+# Python tooling cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local secrets/configuration
+.env
+.env.*
+!.env.example
+
+# Project cache / temporary files
+*.log
+*.tmp
+*.temp
+
+# Tesseract temporary/bundled files
+build_tools/
+/tesseract/
+
+# Local OCR / database data
+SmartImageSearchData/
+*.db
+*.sqlite
+*.sqlite3

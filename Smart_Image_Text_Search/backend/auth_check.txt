@@ -1,0 +1,6 @@
+LOGIN 200
+{'access_token': 'Ad1Dj6R2VtqktY4fmIGtGQKkEVlUNXtAIYEqjmp3ik0', 'token_type': 'bearer', 'expires_at': '2026-11-03T05:33:58.511804'}
+DASH 200
+{'admin_email': 'admin@example.com', 'dashboard': {'total_customers': 0, 'total_licences': 0, 'active_licences': 0, 'inactive_licences': 0, 'unused_product_keys': 0, 'expired_licences': 0, 'disabled_licences': 0, 'revoked_licences': 0, 'total_activated_devices': 0, 'emails_sent': 0, 'failed_email_deliveries': 0}}
+BAD 401
+OK
