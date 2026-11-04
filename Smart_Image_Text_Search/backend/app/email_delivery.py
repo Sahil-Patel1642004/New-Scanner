@@ -29,6 +29,7 @@ def send_email(
 
     Supported providers (EMAIL_PROVIDER env var):
       - mock   : No delivery; returns a fake ID. Useful for development.
+      - brevo  : Uses Brevo (Sendinblue) HTTP API (works on Render free tier, port 443).
       - resend : Uses the Resend HTTP API (works on Render free tier, port 443).
       - smtp   : Direct SMTP (may be blocked on Render free tier, errno 101).
     """
@@ -37,11 +38,73 @@ def send_email(
             raise EmailDeliveryError("Mock email delivery is disabled in production.")
         return f"mock-{make_msgid().strip('<>')}"
 
+    if settings.email_provider == "brevo":
+        return _send_via_brevo(recipient, subject, text_body, html_body)
+
     if settings.email_provider == "resend":
         return _send_via_resend(recipient, subject, text_body, html_body)
 
     # Default: SMTP
     return _send_via_smtp(recipient, subject, text_body, html_body)
+
+
+def _send_via_brevo(
+    recipient: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+) -> str:
+    """Deliver email using Brevo (Sendinblue) transactional HTTP API (port 443)."""
+    if not settings.brevo_api_key:
+        raise EmailDeliveryError(
+            "BREVO_API_KEY is not configured. "
+            "Get an API key from Brevo (SMTP & API -> API Keys) and set BREVO_API_KEY in Render."
+        )
+    if not settings.smtp_from_email:
+        raise EmailDeliveryError(
+            "SMTP_FROM_EMAIL is not configured. Set it to your verified Brevo sender email."
+        )
+
+    try:
+        import httpx
+    except ImportError as exc:
+        raise EmailDeliveryError("httpx is required for Brevo delivery.") from exc
+
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": settings.brevo_api_key,
+        "content-type": "application/json",
+    }
+    payload = {
+        "sender": {
+            "name": settings.app_name,
+            "email": settings.smtp_from_email,
+        },
+        "to": [{"email": recipient}],
+        "subject": subject,
+        "textContent": text_body,
+        "htmlContent": html_body,
+    }
+
+    try:
+        response = httpx.post(url, json=payload, headers=headers, timeout=15.0)
+    except Exception as exc:
+        raise EmailDeliveryError(f"Brevo API request failed: {exc}") from exc
+
+    if response.is_error:
+        try:
+            error_details = response.json()
+            error_msg = error_details.get("message", response.text)
+        except Exception:
+            error_msg = response.text
+        raise EmailDeliveryError(f"Brevo API error ({response.status_code}): {error_msg}")
+
+    try:
+        data = response.json()
+        return data.get("messageId", f"brevo-{make_msgid().strip('<>')}")
+    except Exception:
+        return f"brevo-{make_msgid().strip('<>')}"
 
 
 def _send_via_resend(
@@ -77,7 +140,6 @@ def _send_via_resend(
             "html": html_body,
         }
         response = resend_sdk.Emails.send(params)
-        # response is a dict with an "id" key
         return response.get("id", "resend-unknown-id")
     except Exception as exc:
         raise EmailDeliveryError(f"Resend API delivery failed: {exc}") from exc
