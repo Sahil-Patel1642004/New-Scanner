@@ -44,9 +44,14 @@ def _deliver_licence_email(
     licence: Licence,
     customer: Customer,
     product: Product,
+    is_resend: bool = False,
 ) -> EmailLog:
     actual_key = decrypt_product_key(licence.product_key_ciphertext)
-    subject = "Your Prakshal-Scanora Search Licence"
+    if is_resend:
+        timestamp_str = datetime.now(timezone.utc).strftime("%d %b %H:%M UTC")
+        subject = f"[Resent] Your {product.name} Licence - {licence.licence_type} ({timestamp_str})"
+    else:
+        subject = f"Your {product.name} Licence - {licence.licence_type}"
     text_body = (
         f"Dear {customer.name},\n\n"
         f"Thank you for purchasing {product.name}.\n\n"
@@ -508,7 +513,7 @@ def send_licence_email(
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
 
-    email_log = _deliver_licence_email(db, licence, customer, product)
+    email_log = _deliver_licence_email(db, licence, customer, product, is_resend=True)
     if email_log.status == "FAILED":
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

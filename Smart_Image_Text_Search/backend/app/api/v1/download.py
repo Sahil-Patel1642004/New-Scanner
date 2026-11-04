@@ -27,7 +27,7 @@ def download_installer():
     if settings.installer_download_url:
         return RedirectResponse(
             url=settings.installer_download_url,
-            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            status_code=status.HTTP_302_FOUND,
         )
 
     if not os.path.isfile(_INSTALLER_PATH):
