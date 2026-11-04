@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import os
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -61,9 +62,26 @@ def _deliver_licence_email(
         "4. Click Activate.\n"
         "5. Start using Scanora after successful activation.\n"
     )
-    html_body = html.escape(text_body).replace("\n", "<br>\n")
+    # Build download link for the installer (served by /api/v1/download/installer)
+    download_url = f"{settings.public_base_url}/api/v1/download/installer"
+
+    text_body += (
+        f"\nDownload the installer here:\n"
+        f"{download_url}\n"
+    )
+    safe_text = html.escape(text_body)
+    link_html = (
+        f'<br><br><strong>Download the installer:</strong><br>'
+        f'<a href="{download_url}">{download_url}</a>'
+    )
+    html_body = safe_text.replace("\n", "<br>\n") + link_html
     try:
-        provider_message_id = send_email(customer.email, subject, text_body, html_body)
+        provider_message_id = send_email(
+            customer.email,
+            subject,
+            text_body,
+            html_body,
+        )
     except EmailDeliveryError as error:
         email_log = EmailLog(
             licence_id=licence.id,

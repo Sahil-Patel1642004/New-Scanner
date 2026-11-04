@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -12,7 +13,20 @@ class EmailDeliveryError(Exception):
     pass
 
 
-def send_email(recipient: str, subject: str, text_body: str, html_body: str) -> str:
+def send_email(
+    recipient: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+    attachment_path: str | None = None,
+) -> str:
+    """Send an email and return the Message-ID.
+
+    In mock mode the message is not delivered but a mock Message-ID is returned.
+    ``attachment_path`` is accepted for API compatibility but is intentionally
+    ignored – the installer is too large (> 200 MB) for SMTP.  Instead, a
+    download link is embedded in the email body by the caller.
+    """
     if settings.email_provider == "mock":
         if settings.environment.casefold() == "production":
             raise EmailDeliveryError("Mock email delivery is disabled in production.")

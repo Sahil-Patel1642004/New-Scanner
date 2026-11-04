@@ -22,6 +22,7 @@ class Settings(BaseSettings):
             "http://127.0.0.1:3000",
         ]
     )
+    public_base_url: str = "http://localhost:8000"
     email_provider: str = "mock"
     smtp_host: str | None = None
     smtp_port: int = Field(default=587, ge=1, le=65535)
