@@ -187,7 +187,16 @@ export async function getEmailLogs() {
 
 export function formatDate(value, options = {}) {
   if (!value) return '—';
-  const date = new Date(value);
+  let dateInput = value;
+  if (
+    typeof dateInput === 'string' &&
+    dateInput.includes('T') &&
+    !dateInput.endsWith('Z') &&
+    !/[+-]\d{2}:?\d{2}$/.test(dateInput)
+  ) {
+    dateInput += 'Z';
+  }
+  const date = new Date(dateInput);
   if (Number.isNaN(date.getTime())) return value;
   
   if (options.includeTime) {
