@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -17,7 +18,8 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/login", response_model=AdminSessionPayload)
 def login_admin(payload: AdminLoginRequest, db: Session = Depends(get_db)) -> AdminSessionPayload:
-    admin_user = db.query(AdminUser).filter(AdminUser.email == payload.email).first()
+    clean_email = payload.email.strip().lower()
+    admin_user = db.query(AdminUser).filter(func.lower(AdminUser.email) == clean_email).first()
     if admin_user is None or not verify_password(payload.password, admin_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
