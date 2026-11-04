@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from app.api.v1.admin import router as admin_router
 from app.api.v1.download import router as download_router
+from app.api.v1.download import router as download_router
 from app.api.v1.customers import router as customers_router
 from app.api.v1.email import router as email_router
 from app.api.v1.licences import router as licences_router
@@ -50,6 +51,7 @@ app.include_router(customers_router, prefix="/api/v1")
 app.include_router(licences_router, prefix="/api/v1")
 app.include_router(products_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
+app.include_router(download_router, prefix="/api/v1")
 app.include_router(download_router, prefix="/api/v1")
 
 

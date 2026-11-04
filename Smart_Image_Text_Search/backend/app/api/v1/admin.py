@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import generate_session_token, get_password_hash, verify_password
 from app.dependencies import bearer_scheme, get_current_admin_user, get_db
-from app.models import AdminSession, AdminUser
+from app.models import AdminSession, AdminUser, Customer, DeviceActivation, EmailLog, Licence
 from app.schemas import AdminDashboardResponse, AdminLoginRequest, AdminSessionPayload, AdminSummary
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -72,22 +72,55 @@ def logout_admin(
 
 @router.get("/dashboard", response_model=AdminDashboardResponse)
 def dashboard(
+    db: Session = Depends(get_db),
     current_admin: AdminUser = Depends(get_current_admin_user),
 ) -> AdminDashboardResponse:
+    today = date.today()
+    total_customers = db.query(Customer).count()
+    total_licences = db.query(Licence).count()
+    active_licences = (
+        db.query(Licence)
+        .filter(Licence.is_enabled.is_(True))
+        .filter(Licence.is_revoked.is_(False))
+        .filter(Licence.expiry_date >= today)
+        .count()
+    )
+    expired_licences = (
+        db.query(Licence)
+        .filter(Licence.expiry_date < today)
+        .count()
+    )
+    disabled_licences = (
+        db.query(Licence)
+        .filter(Licence.is_enabled.is_(False))
+        .filter(Licence.is_revoked.is_(False))
+        .count()
+    )
+    revoked_licences = (
+        db.query(Licence)
+        .filter(Licence.is_revoked.is_(True))
+        .count()
+    )
+    total_devices = db.query(DeviceActivation).filter(DeviceActivation.status == "ACTIVE").count()
+    emails_sent = db.query(EmailLog).filter(EmailLog.status.in_(["SENT", "ACCEPTED"])).count()
+    failed_emails = db.query(EmailLog).filter(EmailLog.status == "FAILED").count()
+    unused_keys = db.query(Licence).filter(Licence.status == "UNUSED").count()
+    inactive_licences = total_licences - active_licences
+
     return AdminDashboardResponse(
         admin_email=current_admin.email,
         dashboard=AdminSummary(
-            total_customers=0,
-            total_licences=0,
-            active_licences=0,
-            inactive_licences=0,
-            unused_product_keys=0,
-            expired_licences=0,
-            disabled_licences=0,
-            revoked_licences=0,
-            total_activated_devices=0,
-            emails_sent=0,
-            failed_email_deliveries=0,
+            total_customers=total_customers,
+            total_licences=total_licences,
+            active_licences=active_licences,
+            inactive_licences=inactive_licences,
+            unused_product_keys=unused_keys,
+            expired_licences=expired_licences,
+            disabled_licences=disabled_licences,
+            revoked_licences=revoked_licences,
+            total_activated_devices=total_devices,
+            emails_sent=emails_sent,
+            failed_email_deliveries=failed_emails,
         ),
     )
 
