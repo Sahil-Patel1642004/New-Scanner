@@ -73,7 +73,7 @@ def _send_via_brevo(
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
-        "api-key": settings.brevo_api_key,
+        "api-key": settings.brevo_api_key.strip().strip('"').strip("'"),
         "content-type": "application/json",
     }
     payload = {
