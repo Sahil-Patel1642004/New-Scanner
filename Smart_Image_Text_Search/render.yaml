@@ -32,7 +32,9 @@ services:
       - key: ADMIN_PASSWORD
         generateValue: true
       - key: EMAIL_PROVIDER
-        value: smtp
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -53,6 +55,8 @@ services:
         value: "72"
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "1440"
+      - key: PUBLIC_BASE_URL
+        value: https://new-scanner-zfnp.onrender.com
 
   - type: web
     name: scanora-admin-dashboard
@@ -62,10 +66,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: scanora-licensing-api
-          property: host
+        value: https://new-scanner-zfnp.onrender.com/api/v1
     headers:
       - path: /*
         name: X-Content-Type-Options
