@@ -24,14 +24,72 @@ def send_email(
 
     In mock mode the message is not delivered but a mock Message-ID is returned.
     ``attachment_path`` is accepted for API compatibility but is intentionally
-    ignored – the installer is too large (> 200 MB) for SMTP.  Instead, a
+    ignored - the installer is too large (> 200 MB) for SMTP.  Instead, a
     download link is embedded in the email body by the caller.
+
+    Supported providers (EMAIL_PROVIDER env var):
+      - mock   : No delivery; returns a fake ID. Useful for development.
+      - resend : Uses the Resend HTTP API (works on Render free tier, port 443).
+      - smtp   : Direct SMTP (may be blocked on Render free tier, errno 101).
     """
     if settings.email_provider == "mock":
         if settings.environment.casefold() == "production":
             raise EmailDeliveryError("Mock email delivery is disabled in production.")
         return f"mock-{make_msgid().strip('<>')}"
 
+    if settings.email_provider == "resend":
+        return _send_via_resend(recipient, subject, text_body, html_body)
+
+    # Default: SMTP
+    return _send_via_smtp(recipient, subject, text_body, html_body)
+
+
+def _send_via_resend(
+    recipient: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+) -> str:
+    """Deliver email using the Resend HTTP API (port 443 - works everywhere)."""
+    if not settings.resend_api_key:
+        raise EmailDeliveryError(
+            "RESEND_API_KEY is not configured. "
+            "Sign up at https://resend.com and set RESEND_API_KEY in your environment variables."
+        )
+
+    from_email = settings.smtp_from_email or "noreply@resend.dev"
+
+    try:
+        import resend as resend_sdk  # type: ignore[import]
+    except ImportError as exc:
+        raise EmailDeliveryError(
+            "The 'resend' Python package is not installed. "
+            "Add 'resend>=2.0.0' to requirements.txt and redeploy."
+        ) from exc
+
+    try:
+        resend_sdk.api_key = settings.resend_api_key
+        params: resend_sdk.Emails.SendParams = {
+            "from": from_email,
+            "to": [recipient],
+            "subject": subject,
+            "text": text_body,
+            "html": html_body,
+        }
+        response = resend_sdk.Emails.send(params)
+        # response is a dict with an "id" key
+        return response.get("id", "resend-unknown-id")
+    except Exception as exc:
+        raise EmailDeliveryError(f"Resend API delivery failed: {exc}") from exc
+
+
+def _send_via_smtp(
+    recipient: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+) -> str:
+    """Deliver email using direct SMTP (may be blocked on Render free tier)."""
     if not settings.smtp_host or not settings.smtp_from_email:
         raise EmailDeliveryError("SMTP host and sender address are not configured.")
 

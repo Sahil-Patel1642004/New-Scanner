@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_use_ssl: bool = False
     smtp_timeout_seconds: int = Field(default=15, ge=1, le=60)
+    resend_api_key: str | None = None
     licence_offline_grace_hours: int = Field(default=72, ge=0, le=720)
 
     @field_validator("database_url")
@@ -45,8 +46,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
-        if self.email_provider not in {"mock", "smtp"}:
-            raise ValueError("EMAIL_PROVIDER must be 'mock' or 'smtp'.")
+        if self.email_provider not in {"mock", "smtp", "resend"}:
+            raise ValueError("EMAIL_PROVIDER must be 'mock', 'smtp', or 'resend'.")
         if self.smtp_use_ssl and self.smtp_starttls:
             raise ValueError("SMTP_USE_SSL and SMTP_STARTTLS cannot both be enabled.")
         if bool(self.smtp_username) != bool(self.smtp_password):
@@ -61,8 +62,8 @@ class Settings(BaseSettings):
             raise ValueError("Production requires a unique ADMIN_PASSWORD of at least 12 characters.")
         if not self.database_url.startswith(("postgresql://", "postgresql+psycopg://")):
             raise ValueError("Production requires PostgreSQL; run migrations before starting the API.")
-        if self.email_provider != "smtp":
-            raise ValueError("Production requires EMAIL_PROVIDER=smtp.")
+        if self.email_provider not in ("smtp", "resend"):
+            raise ValueError("Production requires EMAIL_PROVIDER=smtp or EMAIL_PROVIDER=resend.")
         if not self.smtp_host or not self.smtp_from_email:
             raise ValueError("Production SMTP_HOST and SMTP_FROM_EMAIL are required.")
         if not self.smtp_use_ssl and not self.smtp_starttls:

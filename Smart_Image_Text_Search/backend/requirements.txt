@@ -11,3 +11,4 @@ httpx==0.28.1
 cryptography>=44,<47
 pytest==8.4.2
 email-validator==2.2.0
+resend>=2.0.0
