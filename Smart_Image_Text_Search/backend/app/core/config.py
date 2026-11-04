@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     smtp_use_ssl: bool = False
     smtp_timeout_seconds: int = Field(default=15, ge=1, le=60)
     resend_api_key: str | None = None
+    brevo_api_key: str | None = None
     licence_offline_grace_hours: int = Field(default=72, ge=0, le=720)
 
     @field_validator("database_url")
@@ -46,8 +47,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
-        if self.email_provider not in {"mock", "smtp", "resend"}:
-            raise ValueError("EMAIL_PROVIDER must be 'mock', 'smtp', or 'resend'.")
+        if self.email_provider not in {"mock", "smtp", "resend", "brevo"}:
+            raise ValueError("EMAIL_PROVIDER must be 'mock', 'smtp', 'resend', or 'brevo'.")
         if self.smtp_use_ssl and self.smtp_starttls:
             raise ValueError("SMTP_USE_SSL and SMTP_STARTTLS cannot both be enabled.")
         if bool(self.smtp_username) != bool(self.smtp_password):
@@ -62,8 +63,8 @@ class Settings(BaseSettings):
             raise ValueError("Production requires a unique ADMIN_PASSWORD of at least 12 characters.")
         if not self.database_url.startswith(("postgresql://", "postgresql+psycopg://")):
             raise ValueError("Production requires PostgreSQL; run migrations before starting the API.")
-        if self.email_provider not in ("smtp", "resend"):
-            raise ValueError("Production requires EMAIL_PROVIDER=smtp or EMAIL_PROVIDER=resend.")
+        if self.email_provider not in ("smtp", "resend", "brevo"):
+            raise ValueError("Production requires EMAIL_PROVIDER=smtp, resend, or brevo.")
 
         # Provider-specific validation
         if self.email_provider == "smtp":
@@ -76,6 +77,11 @@ class Settings(BaseSettings):
                 raise ValueError("Production Resend requires RESEND_API_KEY.")
             if not self.smtp_from_email:
                 raise ValueError("Production Resend requires SMTP_FROM_EMAIL (the sender address).")
+        elif self.email_provider == "brevo":
+            if not self.brevo_api_key:
+                raise ValueError("Production Brevo requires BREVO_API_KEY.")
+            if not self.smtp_from_email:
+                raise ValueError("Production Brevo requires SMTP_FROM_EMAIL (the verified sender address).")
 
         if not self.cors_origins or any(not self._is_production_origin(origin) for origin in self.cors_origins):
             raise ValueError("Production CORS_ORIGINS must contain HTTPS origins only.")
