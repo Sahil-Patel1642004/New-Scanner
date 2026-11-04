@@ -57,6 +57,8 @@ services:
         value: "72"
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "1440"
+      - key: INSTALLER_DOWNLOAD_URL
+        sync: false
       - key: PUBLIC_BASE_URL
         value: https://new-scanner-zfnp.onrender.com
 
