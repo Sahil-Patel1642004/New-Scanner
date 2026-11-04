@@ -64,10 +64,19 @@ class Settings(BaseSettings):
             raise ValueError("Production requires PostgreSQL; run migrations before starting the API.")
         if self.email_provider not in ("smtp", "resend"):
             raise ValueError("Production requires EMAIL_PROVIDER=smtp or EMAIL_PROVIDER=resend.")
-        if not self.smtp_host or not self.smtp_from_email:
-            raise ValueError("Production SMTP_HOST and SMTP_FROM_EMAIL are required.")
-        if not self.smtp_use_ssl and not self.smtp_starttls:
-            raise ValueError("Production SMTP must use TLS.")
+
+        # Provider-specific validation
+        if self.email_provider == "smtp":
+            if not self.smtp_host or not self.smtp_from_email:
+                raise ValueError("Production SMTP requires SMTP_HOST and SMTP_FROM_EMAIL.")
+            if not self.smtp_use_ssl and not self.smtp_starttls:
+                raise ValueError("Production SMTP must use TLS (set SMTP_STARTTLS=true or SMTP_USE_SSL=true).")
+        elif self.email_provider == "resend":
+            if not self.resend_api_key:
+                raise ValueError("Production Resend requires RESEND_API_KEY.")
+            if not self.smtp_from_email:
+                raise ValueError("Production Resend requires SMTP_FROM_EMAIL (the sender address).")
+
         if not self.cors_origins or any(not self._is_production_origin(origin) for origin in self.cors_origins):
             raise ValueError("Production CORS_ORIGINS must contain HTTPS origins only.")
         return self
