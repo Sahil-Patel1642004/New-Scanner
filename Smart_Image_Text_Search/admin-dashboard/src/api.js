@@ -3,9 +3,10 @@
  * Interacts with the backend licensing server.
  */
 
-export const API_BASE = typeof __SCANORA_API_BASE_URL__ !== 'undefined'
-  ? __SCANORA_API_BASE_URL__
-  : 'http://localhost:8000/api/v1';
+export const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:8000/api/v1'
+).replace(/\/+$/, '');
 
 export const TOKEN_KEY = 'scanora-admin-token';
 export const DEFAULTS_KEY = 'scanora-admin-defaults';
