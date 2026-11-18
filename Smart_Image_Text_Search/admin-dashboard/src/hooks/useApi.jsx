@@ -12,7 +12,6 @@ import {
   createProduct as apiCreateProduct,
   createLicence as apiCreateLicence,
   updateLicence as apiUpdateLicence,
-  sendLicenceEmail as apiSendLicenceEmail,
   revealProductKey as apiRevealProductKey,
 } from '../api';
 import { useToast } from './useToast';
@@ -29,6 +28,7 @@ export function DataProvider({ children }) {
   const [licences, setLicences] = useState([]);
   const [emailLogs, setEmailLogs] = useState([]);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
+  const hasQueuedEmail = emailLogs.some((log) => (log.status || '').toUpperCase() === 'QUEUED');
 
   const { toast } = useToast();
 
@@ -78,6 +78,24 @@ export function DataProvider({ children }) {
     }
   }, [authToken, refreshData]);
 
+  useEffect(() => {
+    if (!authToken || !hasQueuedEmail) return undefined;
+    let cancelled = false;
+    const refreshQueuedEmailLogs = async () => {
+      try {
+        const logs = await getEmailLogs();
+        if (!cancelled) setEmailLogs(logs || []);
+      } catch {
+        // Keep the queued status visible; the user can retry from Email Logs.
+      }
+    };
+    const intervalId = window.setInterval(refreshQueuedEmailLogs, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [authToken, hasQueuedEmail]);
+
   // Listen for auth expiration events
   useEffect(() => {
     const handleAuthExpired = (e) => {
@@ -122,17 +140,11 @@ export function DataProvider({ children }) {
         emailRecipient: result.email_recipient,
         deliveryStatus: result.email_delivery_status,
       });
-
-      let emailMsg = '';
-      if (result.email_delivery_status === 'mock') {
-        emailMsg = ' (Email simulated — configure SMTP for live delivery)';
-      } else if (result.email_delivery_status === 'failed') {
-        emailMsg = ' (Email delivery failed. Check email logs)';
-      } else {
-        emailMsg = ' (Email key queued for delivery)';
-      }
-
-      toast.success(`Licence generated successfully!${emailMsg}`);
+      toast.success(
+        result.email_delivery_status === 'sent'
+          ? `Licence generated and email sent to ${result.email_recipient}.`
+          : 'Licence generated. The email is sending in the background; check Email Logs for its final status.',
+      );
       await refreshData();
       return result;
     } catch (err) {
@@ -176,21 +188,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  const sendLicenceEmail = async (id) => {
-    try {
-      const result = await apiSendLicenceEmail(id);
-      const delivery = result.delivery_status === 'mock'
-        ? `Delivery simulated to ${result.recipient} (SMTP not configured)`
-        : `Key email sent to ${result.recipient}`;
-      toast.success(delivery);
-      await refreshData();
-      return result;
-    } catch (err) {
-      toast.error(err.message || 'Failed to send licence email');
-      throw err;
-    }
-  };
-
   const revealProductKey = async (id) => {
     return apiRevealProductKey(id);
   };
@@ -216,7 +213,6 @@ export function DataProvider({ children }) {
         updateLicence,
         toggleLicenceStatus,
         revokeLicence,
-        sendLicenceEmail,
         revealProductKey,
       }}
     >

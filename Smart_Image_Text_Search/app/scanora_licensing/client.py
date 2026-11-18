@@ -39,13 +39,26 @@ class LicenceClient:
         self.data_directory = _data_directory()
         config_path = self.data_directory / "licence-config.json"
         try:
-            runtime_config = json.loads(config_path.read_text(encoding="utf-8"))
+            if getattr(sys, "frozen", False):
+                bundled_config_path = Path(sys._MEIPASS) / "licence-config.json"
+            else:
+                bundled_config_path = Path(__file__).resolve().parents[2] / "licence-config.json"
+            runtime_config = json.loads(bundled_config_path.read_text(encoding="utf-8"))
         except FileNotFoundError:
             runtime_config = {}
         except (OSError, UnicodeError, ValueError) as error:
-            raise LicenceError("The local licence configuration file could not be read.") from error
+            raise LicenceError("The bundled licence configuration file could not be read.") from error
         if not isinstance(runtime_config, dict):
+            raise LicenceError("The bundled licence configuration must be a JSON object.")
+        try:
+            local_config = json.loads(config_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            local_config = {}
+        except (OSError, UnicodeError, ValueError) as error:
+            raise LicenceError("The local licence configuration file could not be read.") from error
+        if not isinstance(local_config, dict):
             raise LicenceError("The local licence configuration must be a JSON object.")
+        runtime_config.update(local_config)
 
         configured_url = os.environ.get("SCANORA_LICENCE_API_URL") or runtime_config.get("api_base_url")
         configured_pin = os.environ.get("SCANORA_LICENCE_PUBLIC_KEY") or runtime_config.get("public_key")

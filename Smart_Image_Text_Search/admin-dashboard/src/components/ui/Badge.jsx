@@ -57,6 +57,9 @@ export function EmailStatusBadge({ status }) {
   if (normalized === 'FAILED') {
     return <Badge variant="red">Failed</Badge>;
   }
+  if (normalized === 'QUEUED') {
+    return <Badge variant="blue">Queued</Badge>;
+  }
   return <Badge variant="blue">{status || 'Queued'}</Badge>;
 }
 

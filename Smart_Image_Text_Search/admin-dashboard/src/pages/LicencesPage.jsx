@@ -15,7 +15,6 @@ import {
   Eye,
   EyeOff,
   Copy,
-  Mail,
   Edit2,
   Power,
   Trash2,
@@ -36,7 +35,6 @@ export default function LicencesPage() {
     updateLicence,
     toggleLicenceStatus,
     revokeLicence,
-    sendLicenceEmail,
     revealProductKey,
   } = useData();
 
@@ -60,7 +58,6 @@ export default function LicencesPage() {
   const [editingLicence, setEditingLicence] = useState(null);
   const [revokingLicence, setRevokingLicence] = useState(null);
   const [revoking, setRevoking] = useState(false);
-  const [sendingEmailId, setSendingEmailId] = useState(null);
 
   // Sync searchQuery with query param if it changes
   useEffect(() => {
@@ -149,15 +146,6 @@ export default function LicencesPage() {
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
       toast.error('Failed to copy key');
-    }
-  };
-
-  const handleSendEmail = async (lic) => {
-    setSendingEmailId(lic.id);
-    try {
-      await sendLicenceEmail(lic.id);
-    } finally {
-      setSendingEmailId(null);
     }
   };
 
@@ -452,17 +440,6 @@ export default function LicencesPage() {
                               <Power className="w-3.5 h-3.5" />
                             </button>
                           )}
-
-                          {/* Email key */}
-                          <button
-                            type="button"
-                            onClick={() => handleSendEmail(lic)}
-                            disabled={sendingEmailId === lic.id || lic.is_revoked}
-                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-md transition-colors disabled:opacity-40"
-                            title="Send Licence Key via Email"
-                          >
-                            <Mail className="w-3.5 h-3.5" />
-                          </button>
 
                           {/* Revoke */}
                           {!lic.is_revoked && (

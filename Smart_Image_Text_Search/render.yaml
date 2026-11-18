@@ -58,9 +58,9 @@ services:
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "1440"
       - key: INSTALLER_DOWNLOAD_URL
-        sync: false
+        value: https://github.com/Sahil-Patel1642004/New-Scanner/releases/download/v1.0.0/SmartImageSearch-Setup.exe
       - key: PUBLIC_BASE_URL
-        value: https://new-scanner-zfnp.onrender.com
+        value: https://licensing.scanora.prakshal.com
 
   - type: web
     name: scanora-admin-dashboard
@@ -70,7 +70,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://new-scanner-zfnp.onrender.com/api/v1
+        value: https://licensing.scanora.prakshal.com/api/v1
     headers:
       - path: /*
         name: X-Content-Type-Options

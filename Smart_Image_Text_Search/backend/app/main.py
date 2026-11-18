@@ -9,12 +9,12 @@ from sqlalchemy import text
 
 from app.api.v1.admin import router as admin_router
 from app.api.v1.download import router as download_router
-from app.api.v1.download import router as download_router
 from app.api.v1.customers import router as customers_router
 from app.api.v1.email import router as email_router
 from app.api.v1.licences import router as licences_router
 from app.api.v1.products import router as products_router
 from app.core.config import settings
+from app.core.security import get_licence_signing_public_key
 import app.database as database
 from app.db.init_db import ensure_admin_user, initialize_database
 
@@ -52,7 +52,12 @@ app.include_router(licences_router, prefix="/api/v1")
 app.include_router(products_router, prefix="/api/v1")
 app.include_router(email_router, prefix="/api/v1")
 app.include_router(download_router, prefix="/api/v1")
-app.include_router(download_router, prefix="/api/v1")
+
+
+@app.get("/api/v1/licence-config")
+def licence_client_config() -> dict[str, str]:
+    """Expose the signing public key for pinning in the licensed desktop build."""
+    return {"public_key": get_licence_signing_public_key()}
 
 
 @app.get("/health")

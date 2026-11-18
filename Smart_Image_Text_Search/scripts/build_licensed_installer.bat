@@ -35,6 +35,13 @@ if not exist "%STAGE%\dist" mkdir "%STAGE%\dist"
 if not exist "%STAGE%\work" mkdir "%STAGE%\work"
 if not exist "%STAGE%\spec" mkdir "%STAGE%\spec"
 
+echo Fetching the deployed API URL and pinned signing key for the client build...
+"%PYTHON%" scripts\prepare_licence_config.py "%STAGE%"
+if errorlevel 1 (
+  echo Licence client configuration failed. Deploy the API endpoint and retry.
+  exit /b 1
+)
+
 echo Building the licensing-enabled desktop executable in an isolated staging folder...
 "%PYTHON%" -m PyInstaller --noconfirm --clean --onefile --windowed ^
   --name SmartImageSearch ^
@@ -44,6 +51,7 @@ echo Building the licensing-enabled desktop executable in an isolated staging fo
   --icon "%CD%\logo.ico" ^
   --add-data "%CD%\tesseract;tesseract" ^
   --add-data "%CD%\logo.ico;." ^
+  --add-data "%STAGE%\licence-config.json;." ^
   --collect-all fastapi ^
   --collect-all pytesseract ^
   --collect-all pymupdf ^

@@ -38,6 +38,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 
 [InstallDelete]
 Type: files; Name: "{localappdata}\SmartImageSearch\licence.json"
+Type: files; Name: "{localappdata}\SmartImageSearch\licence-config.json"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"

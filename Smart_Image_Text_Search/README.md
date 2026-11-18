@@ -160,15 +160,12 @@ password. URL-encode reserved characters in the password. The existing
 `backend/.env` and SQLite database are not modified by this example change.
 
 Set a local development admin password in `backend/.env` before first startup.
-The development email provider defaults to `mock`; it records mail activity but
-does not deliver messages. Licence creation now sends the product key to the
-selected customer's email automatically; with `mock`, the dashboard explicitly
-reports that delivery was simulated. To send real local test email, first
-revoke any exposed mail credential, then set `EMAIL_PROVIDER=smtp`, use the
-provider's SMTP host/port, set `SMTP_USERNAME` to the full mailbox address,
-store a newly generated app password in `SMTP_PASSWORD`, and set
-`SMTP_FROM_EMAIL` to an authorized sender. Restart the backend after editing
-`.env`. Start the dashboard in another terminal:
+Licence creation queues email delivery in the background so the dashboard does
+not wait for SMTP or installer processing. Set `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL` in the backend `.env`.
+The installer is attached only when it fits the email attachment limit; every
+email also contains a download link. Restart the backend after editing `.env`.
+Start the dashboard in another terminal:
 
 ```powershell
 cd admin-dashboard
@@ -275,8 +272,24 @@ from the production backend environment:
 python -c "from app.core.security import get_licence_signing_public_key; print(get_licence_signing_public_key())"
 ```
 
-Create `%LOCALAPPDATA%\SmartImageSearch\licence-config.json` on each desktop
-client with the deployed API URL and matching public key:
+The backend exposes its public signing key at `/api/v1/licence-config`. Build
+and distribute the licensing-enabled installer only after the API has deployed
+that endpoint:
+
+```bat
+scripts\build_licensed_installer.bat
+```
+
+The build fetches the deployed signing key and embeds it with the API URL in the
+installer. Set `SCANORA_LICENCE_API_URL` before building only when the API uses
+a different host than `https://licensing.scanora.prakshal.com/api/v1`. Publish
+`dist\installer\SmartImageSearch-Licensing-Setup.exe` as the v1.0.1 release,
+then set backend `INSTALLER_DOWNLOAD_URL` to that release asset and redeploy the
+API. Do not use the older `SmartImageSearch-Setup.exe`; it is not the
+licensing-enabled build.
+
+For manual setup, create `%LOCALAPPDATA%\SmartImageSearch\licence-config.json`
+on each desktop client with the deployed API URL and matching public key:
 
 ```json
 {

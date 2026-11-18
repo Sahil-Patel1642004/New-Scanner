@@ -180,9 +180,3 @@ class EmailLogRead(BaseModel):
     created_at: datetime
 
 
-class EmailSendResponse(BaseModel):
-    status: str
-    recipient: str
-    subject: str
-    delivery_status: str
-    email_log_id: int

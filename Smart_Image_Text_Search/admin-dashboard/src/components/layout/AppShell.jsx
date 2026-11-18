@@ -351,10 +351,8 @@ export default function AppShell({ adminEmail, onLogout }) {
             </div>
             <div>
               Status:{' '}
-              <span className="font-medium text-emerald-600 dark:text-emerald-400 capitalize">
-                {newlyCreatedKey?.deliveryStatus === 'mock'
-                  ? 'Simulated (configure backend SMTP for live sending)'
-                  : newlyCreatedKey?.deliveryStatus || 'Sent'}
+              <span className={`font-medium capitalize ${newlyCreatedKey?.deliveryStatus === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                {newlyCreatedKey?.deliveryStatus || 'Unknown'}
               </span>
             </div>
           </div>

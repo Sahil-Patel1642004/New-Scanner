@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import html
-import os
+import logging
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.email_delivery import EmailDeliveryError, send_email
+from app.email_delivery import EmailDeliveryError, send_licence_email
 
 from app.core.security import (
     decrypt_product_key,
@@ -21,9 +20,8 @@ from app.core.security import (
 )
 from app.dependencies import get_current_admin_user, get_db
 from app.models import AdminUser, Customer, DeviceActivation, EmailLog, Licence, Product
+from app.database import SessionLocal
 from app.schemas import (
-    EmailLogRead,
-    EmailSendResponse,
     LicenceActivationRequest,
     LicenceActivationResponse,
     LicenceCreate,
@@ -37,83 +35,56 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/licences", tags=["licences"])
+logger = logging.getLogger(__name__)
 
 
-def _deliver_licence_email(
-    db: Session,
-    licence: Licence,
-    customer: Customer,
-    product: Product,
-    is_resend: bool = False,
-) -> EmailLog:
-    actual_key = decrypt_product_key(licence.product_key_ciphertext)
-    if is_resend:
-        timestamp_str = datetime.now(timezone.utc).strftime("%d %b %H:%M UTC")
-        subject = f"[Resent] Your {product.name} Licence - {licence.licence_type} ({timestamp_str})"
-    else:
-        subject = f"Your {product.name} Licence - {licence.licence_type}"
-    text_body = (
-        f"Dear {customer.name},\n\n"
-        f"Thank you for purchasing {product.name}.\n\n"
-        f"Product: {product.name}\n"
-        f"Product Key: {actual_key}\n"
-        f"Licence Type: {licence.licence_type}\n"
-        f"Start Date: {licence.start_date or licence.issue_date}\n"
-        f"Expiry Date: {licence.expiry_date}\n\n"
-        "Installation instructions:\n"
-        "1. Download and install Scanora.\n"
-        "2. Open the application.\n"
-        "3. Enter your product key.\n"
-        "4. Click Activate.\n"
-        "5. Start using Scanora after successful activation.\n"
-    )
-    # Build download link for the installer (served by /api/v1/download/installer)
-    download_url = f"{settings.public_base_url}/api/v1/download/installer"
-
-    text_body += (
-        f"\nDownload the installer here:\n"
-        f"{download_url}\n"
-    )
-    safe_text = html.escape(text_body)
-    link_html = (
-        f'<br><br><strong>Download the installer:</strong><br>'
-        f'<a href="{download_url}">{download_url}</a>'
-    )
-    html_body = safe_text.replace("\n", "<br>\n") + link_html
+def _send_licence_email_in_background(
+    email_log_id: int,
+    recipient: str,
+    customer_name: str,
+    product_name: str,
+    licence_type: str,
+    product_key: str,
+    start_date: date,
+    expiry_date: date,
+) -> None:
+    logger.info("Starting background licence email delivery (log_id=%s).", email_log_id)
+    db = SessionLocal()
     try:
-        provider_message_id = send_email(
-            customer.email,
-            subject,
-            text_body,
-            html_body,
-        )
-    except EmailDeliveryError as error:
-        email_log = EmailLog(
-            licence_id=licence.id,
-            customer_id=customer.id,
-            recipient=customer.email,
-            subject=subject,
-            status="FAILED",
-            retry_count=0,
-            failed_at=datetime.utcnow(),
-            last_error=str(error)[:1000],
-        )
-    else:
-        is_mock = settings.email_provider == "mock"
-        email_log = EmailLog(
-            licence_id=licence.id,
-            customer_id=customer.id,
-            recipient=customer.email,
-            subject=subject,
-            status="MOCK" if is_mock else "ACCEPTED",
-            provider_message_id=provider_message_id,
-            retry_count=0,
-            sent_at=datetime.utcnow(),
-        )
-    db.add(email_log)
-    db.commit()
-    db.refresh(email_log)
-    return email_log
+        email_log = db.query(EmailLog).filter(EmailLog.id == email_log_id).first()
+        if email_log is None:
+            return
+        try:
+            provider_message_id, _, _ = send_licence_email(
+                recipient=recipient,
+                customer_name=customer_name,
+                product_name=product_name,
+                licence_type=licence_type,
+                product_key=product_key,
+                start_date=start_date,
+                expiry_date=expiry_date,
+            )
+            email_log.status = "SENT"
+            email_log.provider_message_id = provider_message_id
+            email_log.sent_at = datetime.utcnow()
+            email_log.last_error = None
+            logger.info("Licence email accepted by SMTP (log_id=%s).", email_log_id)
+        except EmailDeliveryError as error:
+            email_log.status = "FAILED"
+            email_log.failed_at = datetime.utcnow()
+            email_log.last_error = str(error)[:1000]
+            logger.warning("Licence email failed (log_id=%s): %s", email_log_id, error)
+        except Exception as error:
+            email_log.status = "FAILED"
+            email_log.failed_at = datetime.utcnow()
+            email_log.last_error = f"Unexpected email error ({type(error).__name__})."
+            logger.exception("Unexpected licence email error (log_id=%s).", email_log_id)
+        db.commit()
+    except Exception:
+        logger.exception("Could not update licence email status (log_id=%s).", email_log_id)
+        raise
+    finally:
+        db.close()
 
 
 def _activate_licence_for_device(
@@ -190,6 +161,7 @@ def _activate_licence_for_device(
 @router.post("", response_model=LicenceReadDetail)
 def create_licence(
     payload: LicenceCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin_user),
 ) -> LicenceReadDetail:
@@ -229,8 +201,27 @@ def create_licence(
     db.add(licence)
     db.commit()
     db.refresh(licence)
-    email_log = _deliver_licence_email(db, licence, customer, product)
-
+    email_log = EmailLog(
+        licence_id=licence.id,
+        customer_id=customer.id,
+        recipient=customer.email,
+        subject=f"Your {product.name} licence and installer are ready",
+        status="QUEUED",
+    )
+    db.add(email_log)
+    db.commit()
+    db.refresh(email_log)
+    background_tasks.add_task(
+        _send_licence_email_in_background,
+        email_log.id,
+        customer.email,
+        customer.name,
+        product.name,
+        licence.licence_type,
+        key,
+        licence.start_date or licence.issue_date,
+        licence.expiry_date,
+    )
     return LicenceReadDetail(
         id=licence.id,
         customer_id=licence.customer_id,
@@ -495,35 +486,3 @@ def verify_licence_signature_endpoint(
     return LicenceSignatureVerificationResponse(valid=True, message="Signature verified successfully.", licence_id=licence.id)
 
 
-@router.post("/{licence_id}/send-email", response_model=EmailSendResponse)
-def send_licence_email(
-    licence_id: int,
-    db: Session = Depends(get_db),
-    _: AdminUser = Depends(get_current_admin_user),
-) -> EmailSendResponse:
-    licence = db.query(Licence).filter(Licence.id == licence_id).first()
-    if licence is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licence not found.")
-
-    customer = db.query(Customer).filter(Customer.id == licence.customer_id).first()
-    if customer is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
-
-    product = db.query(Product).filter(Product.id == licence.product_id).first()
-    if product is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
-
-    email_log = _deliver_licence_email(db, licence, customer, product, is_resend=True)
-    if email_log.status == "FAILED":
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Email delivery failed. {email_log.last_error or 'The failure was recorded.'}",
-        )
-
-    return EmailSendResponse(
-        status=email_log.status.lower(),
-        recipient=customer.email,
-        subject=email_log.subject,
-        delivery_status=email_log.status.lower(),
-        email_log_id=email_log.id,
-    )

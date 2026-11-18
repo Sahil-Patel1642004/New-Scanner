@@ -171,12 +171,6 @@ export async function revealProductKey(id) {
   return request(`/licences/${id}/product-key`);
 }
 
-export async function sendLicenceEmail(id) {
-  return request(`/licences/${id}/send-email`, {
-    method: 'POST',
-  });
-}
-
 /* ==================== Email Logs API ==================== */
 
 export async function getEmailLogs() {
