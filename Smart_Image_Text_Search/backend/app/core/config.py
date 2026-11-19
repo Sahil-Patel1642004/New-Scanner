@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     admin_email: str = "admin@localhost"
     admin_password: str = "ChangeMe123!"
     secret_key: str = "development-secret-key-change-me"
-    email_provider: Literal["smtp", "mock"] = "smtp"
+    email_provider: Literal["smtp", "gmail_api", "mock"] = "smtp"
     access_token_expire_minutes: int = 60 * 24
     cors_origins: list[str] = Field(
         default_factory=lambda: [
@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_use_ssl: bool = False
     smtp_timeout_seconds: int = Field(default=30, ge=1, le=120)
+    gmail_client_id: str | None = None
+    gmail_client_secret: SecretStr | None = None
+    gmail_refresh_token: SecretStr | None = None
     licence_offline_grace_hours: int = Field(default=72, ge=0, le=720)
 
     @field_validator("database_url")
@@ -47,12 +50,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
-        if self.environment.casefold() == "production" and self.email_provider != "smtp":
-            raise ValueError("Production requires EMAIL_PROVIDER=smtp.")
+        if self.environment.casefold() == "production" and self.email_provider == "mock":
+            raise ValueError("Production does not allow EMAIL_PROVIDER=mock.")
         if self.smtp_use_ssl and self.smtp_starttls:
             raise ValueError("SMTP_USE_SSL and SMTP_STARTTLS cannot both be enabled.")
         if bool(self.smtp_username) != bool(self.smtp_password):
             raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be configured together.")
+        if self.email_provider == "gmail_api" and not all(
+            (self.gmail_client_id, self.gmail_client_secret, self.gmail_refresh_token, self.smtp_from_email)
+        ):
+            raise ValueError(
+                "EMAIL_PROVIDER=gmail_api requires GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, "
+                "GMAIL_REFRESH_TOKEN, and SMTP_FROM_EMAIL."
+            )
         if self.environment.casefold() != "production":
             return self
 

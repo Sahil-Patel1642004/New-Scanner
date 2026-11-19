@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import html
 import logging
 import smtplib
@@ -133,6 +134,50 @@ The SmartImage Search Team
     return text_body, html_body
 
 
+def _send_with_gmail_api(message: EmailMessage) -> str:
+    """Send a MIME message through Gmail's HTTPS API using an OAuth refresh token."""
+    if not all((settings.gmail_client_id, settings.gmail_client_secret, settings.gmail_refresh_token)):
+        raise EmailDeliveryError(
+            "GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN must be configured."
+        )
+
+    timeout = httpx.Timeout(float(settings.smtp_timeout_seconds))
+    try:
+        token_response = httpx.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": settings.gmail_client_id,
+                "client_secret": settings.gmail_client_secret.get_secret_value(),
+                "refresh_token": settings.gmail_refresh_token.get_secret_value(),
+                "grant_type": "refresh_token",
+            },
+            timeout=timeout,
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json().get("access_token")
+        if not access_token:
+            raise EmailDeliveryError("Google OAuth did not return an access token.")
+
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
+        response = httpx.post(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": raw_message},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        message_id = response.json().get("id")
+        if not message_id:
+            raise EmailDeliveryError("Gmail API accepted no message ID in its response.")
+        return message_id
+    except EmailDeliveryError:
+        raise
+    except httpx.HTTPStatusError as exc:
+        raise EmailDeliveryError(f"Gmail API request failed (HTTP {exc.response.status_code}).") from exc
+    except (httpx.RequestError, ValueError) as exc:
+        raise EmailDeliveryError(f"Gmail API delivery failed ({type(exc).__name__}).") from exc
+
+
 def send_licence_email(
     recipient: str,
     customer_name: str,
@@ -184,6 +229,11 @@ def send_licence_email(
             subtype="zip",
             filename="SmartImageSearch-Setup.zip",
         )
+
+    if settings.email_provider == "gmail_api":
+        provider_message_id = _send_with_gmail_api(message)
+        sent_at = datetime.now(timezone.utc).isoformat()
+        return provider_message_id, subject, sent_at
 
     stage = "connection"
     try:
