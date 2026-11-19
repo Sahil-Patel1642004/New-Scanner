@@ -153,11 +153,12 @@ python -m alembic upgrade head
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The example now targets local PostgreSQL. Before starting, create the
-`scanora_licensing` database in PostgreSQL and replace
-`REPLACE_WITH_LOCAL_PASSWORD` in `backend/.env` with the local PostgreSQL role's
-password. URL-encode reserved characters in the password. The existing
-`backend/.env` and SQLite database are not modified by this example change.
+The backend reads its database connection only from `DATABASE_URL` in
+`backend/.env` (or the hosting provider's environment settings). The example
+targets local PostgreSQL. Before starting, create the `scanora_licensing`
+database and replace `REPLACE_WITH_LOCAL_PASSWORD` in `backend/.env` with your
+local PostgreSQL role's password. URL-encode reserved characters in the
+password. The existing `backend/.env` is not overwritten by these instructions.
 
 Set a local development admin password in `backend/.env` before first startup.
 Licence creation queues email delivery in the background so the dashboard does

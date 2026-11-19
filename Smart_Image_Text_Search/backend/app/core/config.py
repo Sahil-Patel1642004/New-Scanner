@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Prakshal-Scanora Licensing API"
     environment: str = "development"
-    database_url: str = "sqlite:///./licensing_dev.db"
+    database_url: str
     admin_email: str = "admin@localhost"
     admin_password: str = "ChangeMe123!"
     secret_key: str = "development-secret-key-change-me"
