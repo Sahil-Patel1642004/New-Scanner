@@ -142,6 +142,7 @@ def _send_with_gmail_api(message: EmailMessage) -> str:
         )
 
     timeout = httpx.Timeout(float(settings.smtp_timeout_seconds))
+    stage = "OAuth token refresh"
     try:
         token_response = httpx.post(
             "https://oauth2.googleapis.com/token",
@@ -159,6 +160,7 @@ def _send_with_gmail_api(message: EmailMessage) -> str:
             raise EmailDeliveryError("Google OAuth did not return an access token.")
 
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
+        stage = "Gmail message submission"
         response = httpx.post(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -173,9 +175,24 @@ def _send_with_gmail_api(message: EmailMessage) -> str:
     except EmailDeliveryError:
         raise
     except httpx.HTTPStatusError as exc:
-        raise EmailDeliveryError(f"Gmail API request failed (HTTP {exc.response.status_code}).") from exc
+        google_error = ""
+        try:
+            error_body = exc.response.json()
+            if isinstance(error_body, dict):
+                if isinstance(error_body.get("error"), str):
+                    google_error = error_body["error"]
+                elif isinstance(error_body.get("error"), dict):
+                    reasons = error_body["error"].get("errors", [])
+                    reason = reasons[0].get("reason") if reasons and isinstance(reasons[0], dict) else None
+                    google_error = reason or error_body["error"].get("status") or ""
+        except ValueError:
+            pass
+        detail = f", {google_error}" if google_error else ""
+        raise EmailDeliveryError(
+            f"Gmail {stage} failed (HTTP {exc.response.status_code}{detail})."
+        ) from exc
     except (httpx.RequestError, ValueError) as exc:
-        raise EmailDeliveryError(f"Gmail API delivery failed ({type(exc).__name__}).") from exc
+        raise EmailDeliveryError(f"Gmail {stage} failed ({type(exc).__name__}).") from exc
 
 
 def send_licence_email(
