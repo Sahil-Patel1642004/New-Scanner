@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Literal
 from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     admin_email: str = "admin@localhost"
     admin_password: str = "ChangeMe123!"
     secret_key: str = "development-secret-key-change-me"
+    email_provider: Literal["smtp", "mock"] = "smtp"
     access_token_expire_minutes: int = 60 * 24
     cors_origins: list[str] = Field(
         default_factory=lambda: [
@@ -45,6 +47,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
+        if self.environment.casefold() == "production" and self.email_provider != "smtp":
+            raise ValueError("Production requires EMAIL_PROVIDER=smtp.")
         if self.smtp_use_ssl and self.smtp_starttls:
             raise ValueError("SMTP_USE_SSL and SMTP_STARTTLS cannot both be enabled.")
         if bool(self.smtp_username) != bool(self.smtp_password):

@@ -142,6 +142,10 @@ def send_licence_email(
     start_date: object,
     expiry_date: object,
 ) -> tuple[str, str, str]:
+    subject = f"Your {product_name} licence and installer are ready"
+    if settings.email_provider == "mock":
+        return make_msgid(domain="mock.local"), subject, datetime.now(timezone.utc).isoformat()
+
     if not settings.smtp_host or not settings.smtp_from_email:
         raise EmailDeliveryError("SMTP_HOST and SMTP_FROM_EMAIL must be configured.")
 
@@ -152,7 +156,6 @@ def send_licence_email(
         logger.warning("Installer ZIP unavailable for licence email (%s).", error)
         zipped_installer = None
         attachment_note = "The installer ZIP could not be attached. Use the download button below."
-    subject = f"Your {product_name} licence and installer are ready"
     if zipped_installer is None:
         attachment_note = f"{attachment_note} The installer is available using the download button below."
 

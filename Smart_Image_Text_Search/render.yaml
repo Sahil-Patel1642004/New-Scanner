@@ -32,7 +32,7 @@ services:
       - key: ADMIN_PASSWORD
         generateValue: true
       - key: EMAIL_PROVIDER
-        value: resend
+        value: smtp
       - key: RESEND_API_KEY
         sync: false
       - key: BREVO_API_KEY
