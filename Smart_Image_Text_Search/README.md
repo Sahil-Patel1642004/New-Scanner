@@ -187,9 +187,7 @@ or the hosting platform's secret manager. Configure at least:
 - `DATABASE_URL`: PostgreSQL using `postgresql+psycopg://`
 - `EMAIL_PROVIDER=smtp` with `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM_EMAIL`, and
 	either STARTTLS or SMTP-over-SSL; provide `SMTP_USERNAME` and `SMTP_PASSWORD`
-	when required by the provider. On Render Free, use `EMAIL_PROVIDER=gmail_api`
-	with `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, and
-	`SMTP_FROM_EMAIL` because outbound SMTP ports are blocked.
+	when required by the provider.
 - `CORS_ORIGINS`: JSON array containing only HTTPS admin-dashboard origins
 - `LICENCE_OFFLINE_GRACE_HOURS`: signed offline allowance from 0 to 720 hours
 
@@ -211,8 +209,7 @@ global CDN.
 
 Before deploying, set the API's manual environment variables in Render:
 `ADMIN_EMAIL`, `SMTP_FROM_EMAIL`, and `CORS_ORIGINS`. For SMTP, also set
-`EMAIL_PROVIDER=smtp` and the SMTP settings. For Render Free, set
-`EMAIL_PROVIDER=gmail_api` and the Gmail OAuth variables. The
+`EMAIL_PROVIDER=smtp` and the SMTP settings. The
 `CORS_ORIGINS` value must be a JSON array containing the dashboard's exact
 HTTPS origin, for example `["https://scanora-admin-dashboard.onrender.com"]`.
 Set `SMTP_USERNAME` and `SMTP_PASSWORD` together if the SMTP provider requires
