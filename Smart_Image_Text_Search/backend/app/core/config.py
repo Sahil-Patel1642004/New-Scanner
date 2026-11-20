@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     installer_download_url: str | None = "https://github.com/Sahil-Patel1642004/New-Scanner/releases/download/v1.0.0/SmartImageSearch-Setup.exe"
     public_base_url: str = "http://localhost:8000"
     smtp_host: str | None = None
-    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_port: int = Field(default=587, ge=1, le=65535) 
     smtp_username: str | None = None
     smtp_password: SecretStr | None = None
     smtp_from_email: str | None = None
