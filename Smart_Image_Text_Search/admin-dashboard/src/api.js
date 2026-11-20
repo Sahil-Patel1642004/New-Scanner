@@ -177,6 +177,13 @@ export async function getEmailLogs() {
   return request('/email-logs');
 }
 
+export async function sendTestEmail(recipient) {
+  return request('/email-logs/test', {
+    method: 'POST',
+    body: JSON.stringify({ recipient }),
+  });
+}
+
 /* ==================== Date & Business Helpers ==================== */
 
 export function formatDate(value, options = {}) {

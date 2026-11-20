@@ -6,7 +6,7 @@ import StatCard from '../components/ui/StatCard';
 import SearchInput from '../components/ui/SearchInput';
 import Pagination from '../components/ui/Pagination';
 import EmptyState from '../components/ui/EmptyState';
-import { formatDate } from '../api';
+import { formatDate, sendTestEmail } from '../api';
 import {
   Mail,
   CheckCircle,
@@ -28,7 +28,6 @@ export default function EmailPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  // Test email placeholder state
   const [testRecipient, setTestRecipient] = useState('');
   const [testingEmail, setTestingEmail] = useState(false);
 
@@ -81,19 +80,19 @@ export default function EmailPage() {
     return filteredLogs.slice(start, start + pageSize);
   }, [filteredLogs, currentPage, pageSize]);
 
-  const handleSendTestEmail = (e) => {
+  const handleSendTestEmail = async (e) => {
     e.preventDefault();
     if (!testRecipient) return;
     setTestingEmail(true);
-
-    setTimeout(() => {
-      setTestingEmail(false);
-      toast.info(
-        `Test dispatch triggered for ${testRecipient}. If backend SMTP is simulated, message was logged to system records.`,
-        6000
-      );
+    try {
+      const result = await sendTestEmail(testRecipient);
+      toast.success(`Test email sent to ${result.recipient}.`);
       setTestRecipient('');
-    }, 800);
+    } catch (error) {
+      toast.error(error.message || 'Test email could not be sent.');
+    } finally {
+      setTestingEmail(false);
+    }
   };
 
   return (
@@ -275,7 +274,7 @@ export default function EmailPage() {
           <span>Send Test Email Dispatch</span>
         </h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          Verify SMTP connectivity or simulate template generation without issuing a production licence.
+          Send a real test message through the backend SMTP settings without issuing a licence.
         </p>
 
         <form onSubmit={handleSendTestEmail} className="mt-4 flex flex-col sm:flex-row gap-3 max-w-xl">
@@ -292,7 +291,7 @@ export default function EmailPage() {
             disabled={testingEmail || !testRecipient}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
           >
-            {testingEmail ? 'Sending…' : 'Trigger Test'}
+            {testingEmail ? 'Sending…' : 'Send Test Email'}
           </button>
         </form>
       </div>

@@ -133,6 +133,64 @@ The SmartImage Search Team
     return text_body, html_body
 
 
+def _deliver_smtp_message(message: EmailMessage, recipient: str) -> str:
+    if not settings.smtp_host or not settings.smtp_from_email:
+        raise EmailDeliveryError("SMTP_HOST and SMTP_FROM_EMAIL must be configured.")
+
+    stage = "connection"
+    try:
+        if settings.smtp_use_ssl:
+            connection = smtplib.SMTP_SSL(
+                settings.smtp_host,
+                settings.smtp_port,
+                timeout=settings.smtp_timeout_seconds,
+                context=ssl.create_default_context(),
+            )
+        else:
+            connection = smtplib.SMTP(
+                settings.smtp_host,
+                settings.smtp_port,
+                timeout=settings.smtp_timeout_seconds,
+            )
+        with connection as smtp:
+            if settings.smtp_starttls and not settings.smtp_use_ssl:
+                stage = "TLS negotiation"
+                smtp.starttls(context=ssl.create_default_context())
+            if settings.smtp_username and settings.smtp_password:
+                stage = "authentication"
+                smtp.login(settings.smtp_username, settings.smtp_password.get_secret_value())
+            stage = "message submission"
+            refused = smtp.send_message(message)
+            if recipient in refused:
+                raise EmailDeliveryError("The SMTP server refused the recipient.")
+    except EmailDeliveryError:
+        raise
+    except (smtplib.SMTPException, OSError) as exc:
+        raise EmailDeliveryError(f"SMTP delivery failed during {stage} ({type(exc).__name__}).") from exc
+    return message["Message-ID"]
+
+
+def send_test_email(recipient: str) -> tuple[str, str, str]:
+    if settings.email_provider == "mock":
+        raise EmailDeliveryError("Test email cannot be sent while EMAIL_PROVIDER=mock.")
+
+    subject = "Scanora SMTP test email"
+    message = EmailMessage()
+    message["From"] = settings.smtp_from_email or ""
+    message["To"] = recipient
+    message["Subject"] = subject
+    message["Message-ID"] = make_msgid(
+        domain=parseaddr(settings.smtp_from_email or "")[1].rsplit("@", 1)[-1] or None
+    )
+    message["Date"] = formatdate(localtime=True)
+    message.set_content(
+        "This is a test email from the Scanora admin dashboard. "
+        "Your configured SMTP delivery is working."
+    )
+    message_id = _deliver_smtp_message(message, recipient)
+    return message_id, subject, datetime.now(timezone.utc).isoformat()
+
+
 def send_licence_email(
     recipient: str,
     customer_name: str,
@@ -185,36 +243,6 @@ def send_licence_email(
             filename="SmartImageSearch-Setup.zip",
         )
 
-    stage = "connection"
-    try:
-        if settings.smtp_use_ssl:
-            connection = smtplib.SMTP_SSL(
-                settings.smtp_host,
-                settings.smtp_port,
-                timeout=settings.smtp_timeout_seconds,
-                context=ssl.create_default_context(),
-            )
-        else:
-            connection = smtplib.SMTP(
-                settings.smtp_host,
-                settings.smtp_port,
-                timeout=settings.smtp_timeout_seconds,
-            )
-        with connection as smtp:
-            if settings.smtp_starttls and not settings.smtp_use_ssl:
-                stage = "TLS negotiation"
-                smtp.starttls(context=ssl.create_default_context())
-            if settings.smtp_username and settings.smtp_password:
-                stage = "authentication"
-                smtp.login(settings.smtp_username, settings.smtp_password.get_secret_value())
-            stage = "message submission"
-            refused = smtp.send_message(message)
-            if recipient in refused:
-                raise EmailDeliveryError("The SMTP server refused the recipient.")
-    except EmailDeliveryError:
-        raise
-    except (smtplib.SMTPException, OSError) as exc:
-        raise EmailDeliveryError(f"SMTP delivery failed during {stage} ({type(exc).__name__}).") from exc
-
+    message_id = _deliver_smtp_message(message, recipient)
     sent_at = datetime.now(timezone.utc).isoformat()
-    return message["Message-ID"], subject, sent_at
+    return message_id, subject, sent_at
