@@ -4,9 +4,10 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.email_delivery import EmailDeliveryError, send_licence_email
+from app.email_delivery import EmailDeliveryError, send_activation_limit_notice, send_licence_email
 
 from app.core.security import (
     decrypt_product_key,
@@ -87,11 +88,42 @@ def _send_licence_email_in_background(
         db.close()
 
 
+def _send_activation_limit_notice_in_background(email_log_id: int, recipient: str, customer_name: str, product_name: str) -> None:
+    db = SessionLocal()
+    try:
+        email_log = db.query(EmailLog).filter(EmailLog.id == email_log_id).first()
+        if email_log is None:
+            return
+        try:
+            provider_message_id, _, _ = send_activation_limit_notice(recipient, customer_name, product_name)
+            email_log.status = "SENT"
+            email_log.provider_message_id = provider_message_id
+            email_log.sent_at = datetime.utcnow()
+            email_log.last_error = None
+        except EmailDeliveryError as error:
+            email_log.status = "FAILED"
+            email_log.failed_at = datetime.utcnow()
+            email_log.last_error = str(error)[:1000]
+            logger.warning("Activation limit email failed (log_id=%s): %s", email_log_id, error)
+        except Exception as error:
+            email_log.status = "FAILED"
+            email_log.failed_at = datetime.utcnow()
+            email_log.last_error = f"Unexpected email error ({type(error).__name__})."
+            logger.exception("Unexpected activation limit email error (log_id=%s).", email_log_id)
+        db.commit()
+    except Exception:
+        logger.exception("Could not update activation limit email status (log_id=%s).", email_log_id)
+        raise
+    finally:
+        db.close()
+
+
 def _activate_licence_for_device(
     licence: Licence,
     payload: LicenceActivationRequest,
     db: Session,
-) -> LicenceActivationResponse:
+    background_tasks: BackgroundTasks | None = None,
+) -> LicenceActivationResponse | None:
     if licence.is_revoked or not licence.is_enabled:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Licence is disabled or revoked.")
 
@@ -129,6 +161,26 @@ def _activate_licence_for_device(
         )
 
     if len(existing_activations) >= licence.max_devices:
+        if background_tasks is not None:
+            subject = f"Activation limit reached for {licence.product.name}"
+            email_log = EmailLog(
+                licence_id=licence.id,
+                customer_id=licence.customer_id,
+                recipient=licence.customer.email,
+                subject=subject,
+                status="QUEUED",
+            )
+            db.add(email_log)
+            db.commit()
+            db.refresh(email_log)
+            background_tasks.add_task(
+                _send_activation_limit_notice_in_background,
+                email_log.id,
+                licence.customer.email,
+                licence.customer.name,
+                licence.product.name,
+            )
+            return None
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Maximum device activation limit reached.")
 
     activation = DeviceActivation(
@@ -364,26 +416,41 @@ def update_licence(
 def activate_licence(
     licence_id: int,
     payload: LicenceActivationRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin_user),
-) -> LicenceActivationResponse:
+) -> LicenceActivationResponse | JSONResponse:
     licence = db.query(Licence).filter(Licence.id == licence_id).first()
     if licence is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licence not found.")
 
-    return _activate_licence_for_device(licence, payload, db)
+    activation = _activate_licence_for_device(licence, payload, db, background_tasks)
+    if activation is None:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": "Maximum device activation limit reached."},
+            background=background_tasks,
+        )
+    return activation
 
 
 @router.post("/activate", response_model=SignedLicenceActivationResponse)
 def activate_licence_with_key(
     payload: LicenceActivationRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-) -> SignedLicenceActivationResponse:
+) -> SignedLicenceActivationResponse | JSONResponse:
     licence = db.query(Licence).filter(Licence.product_key_hash == hash_product_key(payload.product_key)).first()
     if licence is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid product key.")
 
-    activation = _activate_licence_for_device(licence, payload, db)
+    activation = _activate_licence_for_device(licence, payload, db, background_tasks)
+    if activation is None:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": "Maximum device activation limit reached."},
+            background=background_tasks,
+        )
     entitlement: dict[str, str | int | bool | None] = {
         "licence_id": licence.id,
         "product_id": licence.product_id,

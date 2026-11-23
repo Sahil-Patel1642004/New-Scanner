@@ -191,6 +191,41 @@ def send_test_email(recipient: str) -> tuple[str, str, str]:
     return message_id, subject, datetime.now(timezone.utc).isoformat()
 
 
+def send_activation_limit_notice(recipient: str, customer_name: str, product_name: str) -> tuple[str, str, str]:
+    subject = f"Activation limit reached for {product_name}"
+    if settings.email_provider == "mock":
+        return make_msgid(domain="mock.local"), subject, datetime.now(timezone.utc).isoformat()
+    if not settings.smtp_host or not settings.smtp_from_email:
+        raise EmailDeliveryError("SMTP_HOST and SMTP_FROM_EMAIL must be configured.")
+
+    safe_name = html.escape(customer_name)
+    safe_product = html.escape(product_name)
+    body = (
+        f"Hello {customer_name},\n\n"
+        f"An activation attempt for your {product_name} licence could not be completed because "
+        "the device limit has been reached. If you replaced a device or believe this is an error, "
+        "please contact support.\n\n"
+        "For your security, this notice does not include your product key.\n\n"
+        "Kind regards,\nThe Scanora Team\n"
+    )
+    message = EmailMessage()
+    message["From"] = settings.smtp_from_email
+    message["To"] = recipient
+    message["Subject"] = subject
+    message["Message-ID"] = make_msgid(domain=parseaddr(settings.smtp_from_email)[1].rsplit("@", 1)[-1] or None)
+    message["Date"] = formatdate(localtime=True)
+    message.set_content(body)
+    message.add_alternative(
+        f"<p>Hello {safe_name},</p><p>An activation attempt for your <strong>{safe_product}</strong> "
+        "licence could not be completed because the device limit has been reached. If you replaced a "
+        "device or believe this is an error, please contact support.</p><p>For your security, this notice "
+        "does not include your product key.</p><p>Kind regards,<br>The Scanora Team</p>",
+        subtype="html",
+    )
+    message_id = _deliver_smtp_message(message, recipient)
+    return message_id, subject, datetime.now(timezone.utc).isoformat()
+
+
 def send_licence_email(
     recipient: str,
     customer_name: str,
