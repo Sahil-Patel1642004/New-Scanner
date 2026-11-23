@@ -11,7 +11,20 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
-DEFAULT_API_BASE_URL = "https://licensing.scanora.prakshal.com/api/v1"
+def _api_base_url() -> str:
+    configured = os.environ.get("SCANORA_LICENCE_API_URL") or os.environ.get("VITE_API_BASE_URL")
+    if configured:
+        return configured.strip().strip('"').strip("'").rstrip("/")
+
+    env_file = Path(__file__).resolve().parents[1] / "admin-dashboard" / ".env.production"
+    try:
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key.strip() == "VITE_API_BASE_URL":
+                return value.strip().strip('"').strip("'").rstrip("/")
+    except OSError:
+        pass
+    return ""
 
 
 def main() -> int:
@@ -19,9 +32,15 @@ def main() -> int:
         print("Usage: prepare_licence_config.py <output-directory>", file=sys.stderr)
         return 2
 
-    api_base_url = os.environ.get("SCANORA_LICENCE_API_URL", DEFAULT_API_BASE_URL).rstrip("/")
-    if not api_base_url.startswith("https://"):
-        print("SCANORA_LICENCE_API_URL must use HTTPS.", file=sys.stderr)
+    api_base_url = _api_base_url()
+    if not api_base_url:
+        print(
+            "Set SCANORA_LICENCE_API_URL or VITE_API_BASE_URL to the deployed HTTPS API URL, ending in /api/v1.",
+            file=sys.stderr,
+        )
+        return 2
+    if not api_base_url.startswith("https://") or not api_base_url.endswith("/api/v1"):
+        print("The configured API URL must use HTTPS and end with /api/v1.", file=sys.stderr)
         return 2
 
     request = Request(f"{api_base_url}/licence-config", headers={"Accept": "application/json"})

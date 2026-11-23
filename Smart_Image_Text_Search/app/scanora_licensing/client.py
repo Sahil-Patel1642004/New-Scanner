@@ -122,7 +122,8 @@ class LicenceClient:
             method="POST",
         )
         try:
-            with urlopen(request, timeout=8) as response:
+            # Render instances may need time to wake before answering activation requests.
+            with urlopen(request, timeout=60) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except (UnicodeError, ValueError) as error:
             raise LicenceError("The licence service returned invalid JSON.") from error
@@ -134,7 +135,10 @@ class LicenceClient:
                 detail = "Licence request was rejected."
             raise LicenceError(str(detail)) from error
         except (URLError, TimeoutError, OSError) as error:
-            raise LicenceServiceUnavailable("The licence service could not be reached.") from error
+            host = urlparse(self.api_base_url).netloc
+            raise LicenceServiceUnavailable(
+                f"Could not reach the licence service at {host}. Check the internet connection and API deployment."
+            ) from error
         if not isinstance(result, dict):
             raise LicenceError("The licence service returned an invalid response.")
         return result

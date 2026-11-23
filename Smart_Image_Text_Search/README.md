@@ -57,6 +57,7 @@ dist\installer\SmartImageSearch-Setup.exe
 For the licensing-enabled installer, run:
 
 ```bat
+set SCANORA_LICENCE_API_URL=https://<api-service>.onrender.com/api/v1
 scripts\build_licensed_installer.bat
 ```
 
@@ -283,8 +284,12 @@ scripts\build_licensed_installer.bat
 ```
 
 The build fetches the deployed signing key and embeds it with the API URL in the
-installer. Set `SCANORA_LICENCE_API_URL` before building only when the API uses
-a different host than `https://licensing.scanora.prakshal.com/api/v1`. Publish
+installer. It reads `SCANORA_LICENCE_API_URL` or `VITE_API_BASE_URL` from the
+process environment, or `VITE_API_BASE_URL` from
+`admin-dashboard/.env.production`. Set it to the exact deployed API URL from
+Render, for example `https://<api-service>.onrender.com/api/v1`. The build
+stops if this setting is missing or the signing-key endpoint cannot be
+reached, so it cannot silently package an obsolete API hostname. Publish
 `dist\installer\SmartImageSearch-Licensing-Setup.exe` as the v1.0.1 release,
 then set backend `INSTALLER_DOWNLOAD_URL` to that release asset and redeploy the
 API. Do not use the older `SmartImageSearch-Setup.exe`; it is not the
